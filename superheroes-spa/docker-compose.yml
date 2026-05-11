@@ -1,0 +1,50 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: superheroes-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  api:
+    build:
+      context: ./backend
+    container_name: superheroes-api
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    environment:
+      MONGO_URI: mongodb://mongo:27017/superheroes
+      PORT: 3000
+      HERO_IMAGES_API_URL: https://akabab.github.io/superhero-api/api/all.json
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:3000/api
+    container_name: superheroes-frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5173:4173"
+
+  seed:
+    build:
+      context: ./backend
+    container_name: superheroes-seed
+    depends_on:
+      - mongo
+    environment:
+      MONGO_URI: mongodb://mongo:27017/superheroes
+      HERO_IMAGES_API_URL: https://akabab.github.io/superhero-api/api/all.json
+    command: ["node", "src/seed.js"]
+    profiles: ["seed"]
+
+volumes:
+  mongo_data:

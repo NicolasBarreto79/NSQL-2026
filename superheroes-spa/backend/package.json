@@ -1,0 +1,20 @@
+{
+  "name": "superheroes-backend",
+  "version": "1.0.0",
+  "description": "API REST para SPA de Superhéroes Marvel/DC - Práctica 6 NoSQL",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "seed": "node src/seed.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "mongoose": "^8.8.0",
+    "morgan": "^1.10.0"
+  }
+}
