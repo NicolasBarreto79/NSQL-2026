@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Turismo App</title>
+
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+
+        .container {
+            width: 100%;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 6px;
+            border: none;
+            font-size: 14px;
+        }
+
+        input, select {
+            background: #334155;
+            color: white;
+        }
+
+        button {
+            background: #6366f1;
+            color: white;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #4f46e5;
+        }
+
+        #map {
+            height: 400px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        .card {
+            background: #334155;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 8px;
+        }
+
+        @media(max-width: 800px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Turismo App</h1>
+
+<div class="grid">
+
+<!-- AGREGAR -->
+<div class="panel">
+<h2>Agregar nuevo lugar</h2>
+
+<input id="nombre" placeholder="Nombre del lugar">
+<input id="latA" placeholder="Latitud">
+<input id="lonA" placeholder="Longitud">
+
+<select id="categoriaA">
+    <option value="farmacias">Farmacias</option>
+    <option value="supermercados">Supermercados</option>
+    <option value="universidades">Universidades</option>
+    <option value="cervecerias">Cervecerias</option>
+    <option value="emergencias">Centros de emergencia</option>
+</select>
+
+<button onclick="agregar()">Agregar lugar</button>
+</div>
+
+<!-- BUSCAR -->
+<div class="panel">
+<h2>Buscar lugares cercanos</h2>
+
+<input id="lat" placeholder="Tu latitud">
+<input id="lon" placeholder="Tu longitud">
+
+<select id="categoria">
+    <option value="farmacias">Farmacias</option>
+    <option value="supermercados">Supermercados</option>
+    <option value="universidades">Universidades</option>
+    <option value="cervecerias">Cervecerias</option>
+    <option value="emergencias">Centros de emergencia</option>
+</select>
+
+<button onclick="usarUbicacion()">Usar mi ubicacion</button>
+<button onclick="buscar()">Buscar</button>
+
+<div id="map"></div>
+</div>
+
+</div>
+
+<!-- RESULTADOS -->
+<div class="panel">
+<h2>Resultados</h2>
+<div id="resultados"></div>
+</div>
+
+</div>
+
+<script>
+
+let userLat, userLon;
+
+// Validaciones
+function validarInputs(lat, lon) {
+    if (!lat || !lon) {
+        alert("Debes ingresar latitud y longitud");
+        return false;
+    }
+    if (isNaN(lat) || isNaN(lon)) {
+        alert("La latitud y la longitud deben ser numeros");
+        return false;
+    }
+    return true;
+}
+
+// Geolocalizacion
+function usarUbicacion() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+            userLat = pos.coords.latitude;
+            userLon = pos.coords.longitude;
+
+            document.getElementById("lat").value = userLat;
+            document.getElementById("lon").value = userLon;
+
+            L.marker([userLat, userLon]).addTo(map)
+                .bindPopup("Tu ubicacion")
+                .openPopup();
+
+            map.setView([userLat, userLon], 13);
+        });
+    } else {
+        alert("Tu navegador no soporta geolocalizacion");
+    }
+}
+
+// Agregar
+function agregar() {
+    const lat = document.getElementById("latA").value;
+    const lon = document.getElementById("lonA").value;
+
+    if (!validarInputs(lat, lon)) return;
+
+    fetch("http://localhost:5000/lugares", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            nombre: document.getElementById("nombre").value,
+            lat: lat,
+            lon: lon,
+            categoria: document.getElementById("categoriaA").value
+        })
+    })
+    .then(res => res.json())
+    .then(data => alert("Lugar agregado con ID: " + data.id));
+}
+
+// Buscar
+let markers = [];
+
+function buscar() {
+    userLat = document.getElementById("lat").value;
+    userLon = document.getElementById("lon").value;
+
+    if (!validarInputs(userLat, userLon)) return;
+
+    const categoria = document.getElementById("categoria").value;
+
+    fetch(`http://localhost:5000/lugares-cercanos?lat=${userLat}&lon=${userLon}&categoria=${categoria}`)
+        .then(res => res.json())
+        .then(data => {
+
+            const cont = document.getElementById("resultados");
+            cont.innerHTML = "";
+
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+
+            data.forEach(lugar => {
+
+                const div = document.createElement("div");
+                div.className = "card";
+
+                div.innerHTML = `
+                    <b>${lugar.nombre}</b><br>
+                    ${lugar.categoria}<br>
+                    <button onclick="distancia('${lugar.id}', '${lugar.categoria}')">Ver distancia</button>
+                `;
+
+                cont.appendChild(div);
+
+                const marker = L.marker([lugar.lat, lugar.lon]).addTo(map)
+                    .bindPopup(lugar.nombre);
+
+                marker.on("click", () => {
+                    distancia(lugar.id, lugar.categoria);
+                });
+
+                markers.push(marker);
+            });
+        });
+}
+
+// Distancia
+function distancia(id, categoria) {
+    fetch(`http://localhost:5000/distancia?lat=${userLat}&lon=${userLon}&id=${id}&categoria=${categoria}`)
+        .then(res => res.json())
+        .then(data => {
+            alert("Distancia: " + data.distancia_km + " km");
+        });
+}
+
+// Mapa
+let map = L.map('map').setView([-32.48, -58.23], 13);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {}).addTo(map);
+
+</script>
+
+</body>
+</html>
